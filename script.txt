@@ -1,0 +1,116 @@
+kubectl create namespace kube-test --dry-run=client -o yaml | kubectl apply -f -
+kubectl delete secret flask-web-app-test-secret -n kube-test
+kubectl delete sts flask-web-app-test-sts -n kube-test
+# kubectl delete pvc flask-web-app-test-pvc --wait=false -n kube-test
+kubectl create secret generic flask-web-app-test-secret --from-literal=APP_LOG_DIR=/var/log/flask --from-literal=FLASK_DEBUG=True --from-literal=FLASK_ENV=development 
+ 
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: kube-test
+  labels:
+    identifier: flask-web-app-test-pvc
+  name: flask-web-app-test-pvc
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: kube-test
+  labels:
+    identifier: flask-web-app-test-svc
+  name: flask-web-app-test-svc
+spec:
+  ports:
+    - name: "5000"
+      port: 5000
+      targetPort: 5000
+  selector:
+    app: flask-web-app-test
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    identifier: flask-web-app-test-sts
+  name: flask-web-app-test-sts
+spec:
+  serviceName: flask-web-app-test-svc
+  replicas: 3
+  selector:
+    matchLabels:
+      app: flask-web-app-test
+  template:
+    metadata:
+      labels:
+        app: flask-web-app-test
+        identifier: flask-web-app-test
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - flask-web-app-test
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+        - env:
+            - name: APP_LOG_DIR
+              valueFrom:
+                secretKeyRef:
+                  name: flask-web-app-test-secret
+                  key: APP_LOG_DIR
+            - name: FLASK_DEBUG
+              valueFrom:
+                secretKeyRef:
+                  name: flask-web-app-test-secret
+                  key: FLASK_DEBUG
+            - name: FLASK_ENV
+              valueFrom:
+                secretKeyRef:
+                  name: flask-web-app-test-secret
+                  key: FLASK_ENV
+            - name: KUBE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: KUBE_POD_NAME
+              valueFrom:
+                fieldRef:
+                    fieldPath: metadata.name
+            - name: KUBE_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: KUBE_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+          image: crecentric/flask-k8s-web-app
+          name: flask-k8s-web-app-container
+          ports:
+            - containerPort: 5000
+          resources: {}
+          volumeMounts:
+            - mountPath: /var/log/flask
+              name: flask-web-app-test-volume
+      restartPolicy: Always
+      volumes:
+        - name: flask-web-app-test-volume
+          persistentVolumeClaim:
+            claimName: flask-web-app-test-pvc
+EOF
