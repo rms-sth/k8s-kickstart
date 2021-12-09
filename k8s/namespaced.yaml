@@ -6,6 +6,7 @@
 # kubectl create secret generic flask-web-app-secret --from-literal=APP_LOG_DIR=/var/log/flask --from-literal=FLASK_DEBUG=True --from-literal=FLASK_ENV=development -n crecentric-flask-app
 # kubectl create secret generic flask-web-app-secret --from-literal=APP_LOG_DIR=/var/log/flask --from-literal=FLASK_DEBUG=True --from-literal=FLASK_ENV=development
 
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -34,13 +35,16 @@ metadata:
     identifier: flask-web-app-test-svc
   name: flask-web-app-test-svc
 spec:
-  type: ClusterIP
+  # type: ClusterIP
+  type: LoadBalancer
   ports:
     - name: "5000"
       port: 5000
       targetPort: 5000
+      nodePort: 30000
   selector:
     app: flask-web-app-test
+    # identifier: flask-web-app-test-svc
 ---
 apiVersion: apps/v1
 kind: StatefulSet
