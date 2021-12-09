@@ -1,8 +1,8 @@
 # kubectl create namespace crecentric-flask-app --dry-run=client -o yaml | kubectl apply -f -
 # kubectl delete secret flask-web-app-secret -n crecentric-flask-app -n crecentric-flask-app
 # kubectl delete secret flask-web-app-secret -n crecentric-flask-app
-# kubectl delete sts flask-web-app-test-sts -n crecentric-flask-app
-# kubectl delete pvc flask-web-app-test-pvc --wait=false -n crecentric-flask-app
+# kubectl delete sts flask-web-app-sts -n crecentric-flask-app
+# kubectl delete pvc flask-web-app-pvc --wait=false -n crecentric-flask-app
 # kubectl create secret generic flask-web-app-secret --from-literal=APP_LOG_DIR=/var/log/flask --from-literal=FLASK_DEBUG=True --from-literal=FLASK_ENV=development -n crecentric-flask-app
 # kubectl create secret generic flask-web-app-secret --from-literal=APP_LOG_DIR=/var/log/flask --from-literal=FLASK_DEBUG=True --from-literal=FLASK_ENV=development
 # sudo vim /etc/hosts
@@ -46,7 +46,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: flask-web-app-test-svc
+                name: flask-web-app-svc
                 port:
                   number: 5000
 
@@ -56,8 +56,8 @@ kind: PersistentVolumeClaim
 metadata:
   namespace: crecentric-flask-app
   labels:
-    identifier: flask-web-app-test-pvc
-  name: flask-web-app-test-pvc
+    identifier: flask-web-app-pvc
+  name: flask-web-app-pvc
 spec:
   storageClassName: standard
   accessModes:
@@ -72,8 +72,8 @@ kind: Service
 metadata:
   namespace: crecentric-flask-app
   labels:
-    identifier: flask-web-app-test-svc
-  name: flask-web-app-test-svc
+    identifier: flask-web-app-svc
+  name: flask-web-app-svc
 spec:
   type: ClusterIP # provides internal routing
   # type: LoadBalancer # provides external routing
@@ -83,7 +83,7 @@ spec:
       targetPort: 5000
       # nodePort: 30000
   selector:
-    app: flask-web-app-test
+    app: flask-web-app
 
 ---
 apiVersion: apps/v1
@@ -91,19 +91,19 @@ kind: StatefulSet
 metadata:
   namespace: crecentric-flask-app
   labels:
-    identifier: flask-web-app-test-sts
-  name: flask-web-app-test-sts
+    identifier: flask-web-app-sts
+  name: flask-web-app-sts
 spec:
-  serviceName: flask-web-app-test-svc
+  serviceName: flask-web-app-svc
   replicas: 3
   selector:
     matchLabels:
-      app: flask-web-app-test
+      app: flask-web-app
   template:
     metadata:
       labels:
-        app: flask-web-app-test
-        identifier: flask-web-app-test-sts
+        app: flask-web-app
+        identifier: flask-web-app-sts
     spec:
       affinity:
         podAntiAffinity:
@@ -113,7 +113,7 @@ spec:
                   - key: app
                     operator: In
                     values:
-                      - flask-web-app-test
+                      - flask-web-app
               topologyKey: "kubernetes.io/hostname"
       containers:
         - image: crecentric/flask
@@ -122,7 +122,7 @@ spec:
             - containerPort: 5000
           resources: {}
           volumeMounts:
-            - name: flask-web-app-test-volume
+            - name: flask-web-app-volume
               mountPath: /var/log/flask
               subPath: logs
           env:
@@ -164,6 +164,6 @@ spec:
 
       restartPolicy: Always
       volumes:
-        - name: flask-web-app-test-volume
+        - name: flask-web-app-volume
           persistentVolumeClaim:
-            claimName: flask-web-app-test-pvc
+            claimName: flask-web-app-pvc
