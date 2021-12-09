@@ -161,7 +161,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
-
       restartPolicy: Always
       volumes:
         - name: flask-web-app-volume
